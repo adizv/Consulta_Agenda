@@ -5,18 +5,19 @@ import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
+import androidx.preference.PreferenceManager;
 
 import android.Manifest;
-import android.content.ComponentName;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.ContactsContract;
-import android.provider.UserDictionary;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -127,6 +128,12 @@ public class MainActivity extends AppCompatActivity {
         etPhone = findViewById(R.id.etPhone);
         tvResult = findViewById(R.id.tvResult);
 
+        SharedPreferences preferenciasActividad = getPreferences(Context.MODE_PRIVATE);
+        String lastSearch = preferenciasActividad.getString(getString(R.string.last_search), "");
+        if(!lastSearch.isEmpty()) {
+            etPhone.setText(lastSearch);
+        }
+
         btSearch.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -141,64 +148,48 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void search() {
-        tvResult.setText("a pelo ya sí");
-        //buscar entre los contactos
-        //ContentProvider Proveedor de contenidos
-        //ContentResolver Consultor de contenidos
-        // Queries the user dictionary and returns results
-        //url: https://ieszaidinvergeles.org/carpeta/carpeta2/pagina.html?dato=1
-        //uri: protocolo://dirección/ruta/recurso
-        /*Cursor cursor = getContentResolver().query(
-                UserDictionary.Words.CONTENT_URI,
-                new String[] {"projection"},
-                "campo1 = ? and campo2 > ? or campo3 = ? ",
-                new String[] {"pepe", "4", "23"},
-                "campo5, camp3, campo4");*/
-        /*Uri uri = ContactsContract.Contacts.CONTENT_URI;
-        String proyeccion[] = new String[] {ContactsContract.Contacts.DISPLAY_NAME};
-        String seleccion = ContactsContract.Contacts.IN_VISIBLE_GROUP + " = ? and " +
-                ContactsContract.Contacts.HAS_PHONE_NUMBER + "= ?";
-        String argumentos[] = new String[]{"1","1"};
-        //seleccion = null;
-        //argumentos = null;
-        String orden = ContactsContract.Contacts.DISPLAY_NAME + " collate localized asc";
+        String phone = etPhone.getText().toString();
+
+        tvResult.setText("");
+
+        SharedPreferences preferenciasActividad = getPreferences(Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = preferenciasActividad.edit();
+        editor.putString(getString(R.string.last_search), phone);
+        editor.commit();
+
+        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this );
+        String email = sharedPreferences.getString(getString(R.string.settings_email), getString(R.string.no_email));
+        tvResult.append(email + "\n");
+
+        phone = searchFormat(phone);
+        Uri uri = ContactsContract.CommonDataKinds.Phone.CONTENT_URI;
+        String proyeccion[] = new String[]{ContactsContract.CommonDataKinds.Phone.NUMBER,
+                ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME};
+        String seleccion = ContactsContract.CommonDataKinds.Phone.NUMBER + " like ?";
+        String argumentos[] = new String[]{ phone };//etPhone.getText().toString()};
+        String orden = ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME;
         Cursor cursor = getContentResolver().query(uri, proyeccion, seleccion, argumentos, orden);
         String[] columnas = cursor.getColumnNames();
-        for(String s: columnas) {
-            Log.v(TAG, s);
-        }
-        String displayName;
-        int columna = cursor.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME);
-        while(cursor.moveToNext()) {
-            displayName = cursor.getString(columna);
-            Log.v(TAG, displayName);
-        }*/
-
-        Uri uri2 = ContactsContract.CommonDataKinds.Phone.CONTENT_URI;
-        Log.v(TAG, uri2.toString());
-        String proyeccion2[] = new String[]{ContactsContract.CommonDataKinds.Phone.NUMBER,
-                ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME};
-        String seleccion2 = ContactsContract.CommonDataKinds.Phone.NUMBER + " like ?";
-        String argumentos2[] = new String[]{"1%2%3"};//etPhone.getText().toString()};
-        String orden2 = ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME;
-        Cursor cursor2 = getContentResolver().query(uri2, proyeccion2, seleccion2, argumentos2, orden2);
-        String[] columnas2 = cursor2.getColumnNames();
-        for(String s: columnas2) {
-            Log.v(TAG, s);
-        }
-        int columnaNombre = cursor2.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME);
-        int columnaNumero = cursor2.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER);
+        int columnaNombre = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME);
+        int columnaNumero = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER);
         String nombre, numero;
-        while(cursor2.moveToNext()) {
-            nombre = cursor2.getString(columnaNombre);
-            numero = cursor2.getString(columnaNumero);
-            //Log.v(TAG, nombre + ": " + numero);
-            for(String s: columnas2) {
-                int pos = cursor2.getColumnIndex(s);
-                String valor = cursor2.getString(pos);
-                Log.v(TAG, pos + " " + s + " " + valor);
+        while(cursor.moveToNext()) {
+            nombre = cursor.getString(columnaNombre);
+            numero = cursor.getString(columnaNumero);
+            for(String s: columnas) {
+                int pos = cursor.getColumnIndex(s);
+                String valor = cursor.getString(pos);
+                tvResult.append(s + " " + valor + "\n");
             }
         }
+    }
+
+    private String searchFormat(String phone) {
+        String newString = "";
+        for (char ch: phone.toCharArray()) {
+            newString += ch + "%";
+        }
+        return newString;
     }
 
     private void searchIfPermitted() {
@@ -250,3 +241,35 @@ public class MainActivity extends AppCompatActivity {
         startActivity(intent);
     }
 }
+
+//buscar entre los contactos
+//ContentProvider Proveedor de contenidos
+//ContentResolver Consultor de contenidos
+// Queries the user dictionary and returns results
+//url: https://ieszaidinvergeles.org/carpeta/carpeta2/pagina.html?dato=1
+//uri: protocolo://dirección/ruta/recurso
+        /*Cursor cursor = getContentResolver().query(
+                UserDictionary.Words.CONTENT_URI,
+                new String[] {"projection"},
+                "campo1 = ? and campo2 > ? or campo3 = ? ",
+                new String[] {"pepe", "4", "23"},
+                "campo5, camp3, campo4");*/
+        /*Uri uri = ContactsContract.Contacts.CONTENT_URI;
+        String proyeccion[] = new String[] {ContactsContract.Contacts.DISPLAY_NAME};
+        String seleccion = ContactsContract.Contacts.IN_VISIBLE_GROUP + " = ? and " +
+                ContactsContract.Contacts.HAS_PHONE_NUMBER + "= ?";
+        String argumentos[] = new String[]{"1","1"};
+        //seleccion = null;
+        //argumentos = null;
+        String orden = ContactsContract.Contacts.DISPLAY_NAME + " collate localized asc";
+        Cursor cursor = getContentResolver().query(uri, proyeccion, seleccion, argumentos, orden);
+        String[] columnas = cursor.getColumnNames();
+        for(String s: columnas) {
+            Log.v(TAG, s);
+        }
+        String displayName;
+        int columna = cursor.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME);
+        while(cursor.moveToNext()) {
+            displayName = cursor.getString(columna);
+            Log.v(TAG, displayName);
+        }*/
